@@ -1,0 +1,161 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function overview_menu() {
+  $items['admin/config/content/overview'] = array(
+    'title' => 'Overview pages',
+    'description' => 'Configure overview pages.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('overview_admin_form'),
+    'access arguments' => array('administer overview'),
+    'file' => 'overview.admin.inc',
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function overview_permission() {
+  return array(
+    'administer overview' => array(
+      'title' => t('Administer Overview'),
+      'description' => t('Change overview pages per content type.'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_views_pre_render().
+ */
+function overview_views_pre_render(&$view) {
+  $display = &$view->display[$view->current_display];
+
+  if (isset($display->use_more)) {
+    // First, we check if this display uses a more link.
+    $use_more = $display->use_more;
+  }
+  else {
+    // Check if the default display has the use more setting
+    $use_more = $view->display['default']->display_options['use_more'];
+  }
+
+  // Return if no use_more is used here.
+  if (!$use_more) {
+    return;
+  }
+
+  // Get the current link URL
+  $link_url = &$display->display_options['link_url'];
+  $original_url = $link_url;
+
+  // Check if the link URL matches [overview] (without specifying a type)
+  $pattern = '/\[overview\]/';
+  if (preg_match($pattern, $link_url)) {
+    $global_overview = url('<front>');
+    // Try to extract the type filter (if there is only one in use).
+    if (isset($view->filter) and isset($view->filter['type']) and isset($view->filter['type']->value)
+      and count($view->filter['type']->value) === 1) {
+      $type = array_shift($view->filter['type']->value);
+      if ($overview_page = variable_get('overview__' . $type, FALSE)) {
+        $global_overview = $overview_page;
+      }
+    }
+
+    $link_url = preg_replace($pattern, $global_overview, $link_url);
+  }
+
+  // Check if the link URL matches [overview:<TYPE>]
+  $pattern = '/\[overview:(.+)\]/';
+  if (preg_match($pattern, $link_url, $matches) and count($matches) > 1
+  and $overview_page = variable_get('overview__' . $matches[1], FALSE)) {
+    $link_url = preg_replace($pattern, $overview_page, $link_url);
+  }
+
+  if ($original_url !== $link_url) {
+    $display->handler->set_option('link_url', $link_url);
+  }
+}
+
+/**
+ * Implements hook_hansel_action_types().
+ */
+function overview_hansel_action_types() {
+  return array(
+    'add link to overview' => array(
+      'get crumbs' => 'overview_hansel_get_crumbs',
+      'info' => 'overview_hansel_info',
+      'config form' => 'overview_hansel_config_form',
+    ),
+  );
+}
+
+/**
+ * Callback for Hansel get crumbs
+ *
+ * @param array $arguments
+ * @return array $links
+ */
+function overview_hansel_get_crumbs($arguments) {
+  $links = array();
+  $node = node_load(hansel_arg(1));
+
+  if (!$node) {
+    return array();
+  }
+
+  $cid = 'overview:' . $node->type;
+  if ($data = hansel_cache_get($cid)) {
+    return $data;
+  }
+
+  if ($overview_page = variable_get('overview__' . $node->type, FALSE)) {
+    if (!empty($arguments['override_path'])) {
+      $title = $arguments['override_path'];
+    }
+    else {
+      $menu = menu_get_item($overview_page);
+      $title = $menu['title'];
+    }
+    $links[] = array(
+      'href' => url($overview_page),
+      'title' => $title,
+    );
+  }
+
+  hansel_cache_set($cid, $links);
+  return $links;
+}
+
+/**
+ * Callback for Hansel info
+ *
+ * @param array $arguments
+ * @return string $info
+ */
+function overview_hansel_info($arguments) {
+  return t('Add overview path based on node type.');
+}
+
+/**
+ * Callback for Hansel config form
+ *
+ * @param array $arguments
+ * @return array $form
+ */
+function overview_hansel_config_form($arguments) {
+  $form = array();
+
+  $form['override_path'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Override title in breadcrumb'),
+    '#description' => t('Fill in an alternative title to use in the breadcrumb (defaults to the menu title of the overview page)'),
+    '#default_value' => isset($arguments['override_path']) ? $arguments['override_path'] : '',
+  );
+
+  return $form;
+}
