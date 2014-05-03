@@ -1,0 +1,40 @@
+<?php
+
+/**
+ * Implements hook_views_pre_render().
+ */
+function overview_views_views_pre_render(&$view) {
+  $display = &$view->display[$view->current_display];
+
+  $use_more = FALSE;
+  if (isset($display->use_more)) {
+    // First, we check if this display uses a more link.
+    $use_more = $display->use_more;
+  }
+  else if (isset($view->display['default']->display_options['use_more'])) {
+    // Check if the default display has the use more setting
+    $use_more = $view->display['default']->display_options['use_more'];
+  }
+
+  // Return if no use_more is used here.
+  if (!$use_more) {
+    return;
+  }
+
+  // Get the current link URL
+  $link_url = &$display->display_options['link_url'];
+  $original_url = $link_url;
+
+  $data = array();
+  if (isset($view->filter) and isset($view->filter['type']) and isset($view->filter['type']->value)
+    and count($view->filter['type']->value) === 1) {
+    $data['node'] = array(
+      'type' => array_shift($view->filter['type']->value),
+    );
+  }
+
+  $link_url = token_replace($link_url, $data);
+  if ($original_url !== $link_url) {
+    $display->handler->set_option('link_url', $link_url);
+  }
+}

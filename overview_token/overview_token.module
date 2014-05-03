@@ -1,0 +1,107 @@
+<?php
+
+/**
+ * Implements hook_token_info().
+ */
+function overview_token_token_info() {
+  $info['types']['overview'] = array(
+    'name' => t('Ovefview'),
+    'description' => t('Tokens related to overview pages.'),
+  );
+
+  $info['tokens']['overview'] = array();
+  foreach (node_type_get_types() as $type) {
+    $info['tokens']['overview'][$type->type . ':url'] = array(
+      'name' => t('Overview URL (Aliased)'),
+      'description' => t('The aliases overview url for this node.'),
+    );
+    $info['tokens']['overview'][$type->type . ':url:raw'] = array(
+      'name' => t('Overview URL (Raw)'),
+      'description' => t('The raw, unaliases overview url for this node.'),
+    );
+    $info['tokens']['overview'][$type->type . ':title'] = array(
+      'name' => t('Overview Title'),
+      'description' => t('The title of the overview page for this node.'),
+    );
+  }
+
+  $info['tokens']['node'] = array(
+    'overview:url' => array(
+      'name' => t('Overview URL (Aliased)'),
+      'description' => t('The aliases overview url for this node.'),
+    ),
+    'overview:url:raw' => array(
+      'name' => t('Overview URL (Raw)'),
+      'description' => t('The raw, unaliases overview url for this node.'),
+    ),
+    'overview:title' => array(
+      'name' => t('Overview Title'),
+      'description' => t('The title of the overview page for this node.'),
+    ),
+  );
+
+  return $info;
+}
+
+/**
+ * Implements hook_tokens().
+ */
+function overview_token_tokens($type, $tokens, array $data = array(), array $options = array()) {
+  $replacements = array();
+
+  if ($type === 'node' and !empty($data['node']) and $url = overview_get_url($data['node']->type)) {
+    foreach ($tokens as $name => $original) {
+      switch($name) {
+        case 'overview:url':
+          $replacements[$original] = url($url);
+          break;
+        case 'overview:url:raw':
+          $replacements[$original] = $url;
+          break;
+        case 'overview:title':
+          $url = str_replace('<front>', variable_get('site_frontpage', 'node'), $url);
+          if ($item = menu_get_item($url)) {
+            $replacements[$original] = $options['sanitize'] ? check_plain($item['title']) : $item['title'];
+          }
+          break;
+        default:
+          break;
+      }
+    }
+  }
+  else if ($type === 'overview') {
+    $items = array();
+    foreach (node_type_get_types() as $type) {
+      $items[] = preg_quote($type->type);
+    }
+    $regex = '/^(' . join('|', $items) . ')\:(url\:raw|url|title)$/';
+
+    foreach ($tokens as $name => $original) {
+      if (!preg_match($regex, $name, $matches)) {
+        continue;
+      }
+
+      list(, $node_type, $token_type) = $matches;
+      if ($url = overview_get_url($node_type)) {
+        switch($token_type) {
+          case 'url':
+            $replacements[$original] = url($url);
+            break;
+          case 'url:raw':
+            $replacements[$original] = $url;
+            break;
+          case 'title':
+            $url = str_replace('<front>', variable_get('site_frontpage', 'node'), $url);
+            if ($item = menu_get_item($url)) {
+              $replacements[$original] = $options['sanitize'] ? check_plain($item['title']) : $item['title'];
+            }
+            break;
+          default:
+            break;
+        }
+      }
+    }
+  }
+
+  return $replacements;
+}

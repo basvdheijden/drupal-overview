@@ -1,0 +1,80 @@
+<?php
+
+/**
+ * Implements hook_hansel_action_types().
+ */
+function overview_hansel_hansel_action_types() {
+  return array(
+    'add link to overview' => array(
+      'get crumbs' => 'overview_hansel_hansel_get_crumbs',
+      'info' => 'overview_hansel_hansel_info',
+      'config form' => 'overview_hansel_hansel_config_form',
+    ),
+  );
+}
+
+/**
+ * Callback for Hansel get crumbs
+ *
+ * @param array $arguments
+ * @return array $links
+ */
+function overview_hansel_hansel_get_crumbs($arguments) {
+  $links = array();
+  $node = node_load(hansel_arg(1));
+
+  if (!$node) {
+    return array();
+  }
+
+  $cid = 'overview:' . $node->type;
+  if ($data = hansel_cache_get($cid)) {
+    return $data;
+  }
+
+  if ($overview_page = overview_get_url($node->type)) {
+    if (!empty($arguments['override_path'])) {
+      $title = $arguments['override_path'];
+    }
+    else {
+      $menu = menu_get_item($overview_page);
+      $title = $menu['title'];
+    }
+    $links[] = array(
+      'href' => url($overview_page),
+      'title' => t($title),
+    );
+  }
+
+  hansel_cache_set($cid, $links);
+  return $links;
+}
+
+/**
+ * Callback for Hansel info
+ *
+ * @param array $arguments
+ * @return string $info
+ */
+function overview_hansel_hansel_info($arguments) {
+  return t('Add overview path based on node type.');
+}
+
+/**
+ * Callback for Hansel config form
+ *
+ * @param array $arguments
+ * @return array $form
+ */
+function overview_hansel_hansel_config_form($arguments) {
+  $form = array();
+
+  $form['override_path'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Override title in breadcrumb'),
+    '#description' => t('Fill in an alternative title to use in the breadcrumb (defaults to the menu title of the overview page)'),
+    '#default_value' => isset($arguments['override_path']) ? $arguments['override_path'] : '',
+  );
+
+  return $form;
+}

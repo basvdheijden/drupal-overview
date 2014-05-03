@@ -7,32 +7,34 @@
  */
 
 function overview_admin_form($form, &$form_state) {
-  $form_state['types'] = array();
-  foreach (node_type_get_types() as $type => $info) {
-    $key = 'overview__' . $type;
-    $form_state['types'][] = $key;
+  $form['#tree'] = TRUE;
 
-    $form['overview_node_type__' . $type] = array(
+  $settings = variable_get('overview', array());
+  $form['overview'] = array();
+  foreach (node_type_get_types() as $type => $info) {
+    $form['overview'][$type] = array(
       '#title' => $info->name,
       '#type' => 'fieldset',
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
     );
 
-    $form['overview_node_type__' . $type][$key] = array(
+    $form['overview'][$type]['url'] = array(
       '#type' => 'textfield',
       '#title' => t('Overview URL'),
-      '#default_value' => variable_get($key, ''),
+      '#default_value' => (isset($settings[$type]) and isset($settings[$type]['url'])) ? $settings[$type]['url'] : '',
     );
   }
 
-  return system_settings_form($form);
+  $form = system_settings_form($form);
+  unset($form['#submit']);
+  return $form;
 }
 
 function overview_admin_form_validate($form, &$form_state) {
-  foreach ($form_state['types'] as $type) {
-    if (!empty($form_state['values'][$type])) {
-      $internal_path = drupal_get_normal_path($form_state['values'][$type]);
+  foreach ($form_state['values']['overview'] as $type => &$vals) {
+    if (!empty($vals['url'])) {
+      $internal_path = drupal_get_normal_path($vals['url']);
 
       if (!drupal_valid_path($internal_path)) {
         form_set_error($type, t("The path '@link_path' is either invalid or you do not have access to it.", array(
@@ -40,8 +42,13 @@ function overview_admin_form_validate($form, &$form_state) {
         )));
       }
       else {
-        $form_state['values'][$type] = $internal_path;
+        $vals['url'] = $internal_path;
       }
     }
   }
+}
+
+function overview_admin_form_submit($form, &$form_state) {
+  variable_set('overview', $form_state['values']['overview']);
+  drupal_set_message(t('The configuration options have been saved.'));
 }

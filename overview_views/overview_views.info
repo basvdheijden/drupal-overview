@@ -1,0 +1,8 @@
+name = Overview Views
+description = Overview Views plugin
+core = 7.x
+package = Overview
+
+dependencies[] = overview
+dependencies[] = views
+dependencies[] = overview_token

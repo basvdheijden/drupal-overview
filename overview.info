@@ -1,3 +1,4 @@
 name = Overview
 description = Configurable overview pages for content types
 core = 7.x
+package = Overview
